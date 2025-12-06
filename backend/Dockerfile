@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Prisma için gerekli kütüphaneler
-RUN apk add --no-cache openssl openssl-dev libc6-compat
+# Prisma için gerekli kütüphaneler ve dos2unix
+RUN apk add --no-cache openssl openssl-dev libc6-compat dos2unix
 
 WORKDIR /app
 
@@ -13,9 +13,9 @@ RUN npx prisma generate
 
 COPY . .
 
-# Entrypoint script'i çalıştırılabilir yap
+# Entrypoint script'i çalıştırılabilir yap (CRLF -> LF dönüşümü)
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN dos2unix /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 EXPOSE 3001
 

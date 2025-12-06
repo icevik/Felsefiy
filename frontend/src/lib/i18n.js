@@ -991,6 +991,11 @@ export function LanguageProvider({ children }) {
       return value;
     }
 
+    // Array değerleri de destekle
+    if (Array.isArray(value)) {
+      return value;
+    }
+
     return key;
   };
 

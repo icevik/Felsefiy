@@ -38,3 +38,4 @@ backend/prisma/migrations/
 .env.temp
 .windsurf
 .cursor
+temp.md
