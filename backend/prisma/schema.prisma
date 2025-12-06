@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Test edilen hedef sistem
+model Project {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  
+  // Target API Configuration
+  targetUrl   String
+  method      String    @default("POST")
+  headers     Json      @default("{}")
+  bodyTemplate String   @default("{\"prompt\": \"{{prompt}}\"}")
+  
+  // AI Model Settings
+  attackerModel   String @default("anthropic/claude-3-haiku")
+  moderatorModel  String @default("anthropic/claude-3-haiku")
+  
+  // Statistics
+  totalSessions   Int @default(0)
+  successfulJailbreaks Int @default(0)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  sessions    Session[]
+  
+  @@map("projects")
+}
+
+// Saldırı oturumu
+model Session {
+  id          String    @id @default(uuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  strategyId  String?
+  strategy    Strategy? @relation(fields: [strategyId], references: [id])
+  
+  status      SessionStatus @default(RUNNING)
+  result      SessionResult @default(PENDING)
+  
+  // Session Statistics
+  totalRounds     Int @default(0)
+  maxRounds       Int @default(10)
+  
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  
+  messages    Message[]
+  
+  @@map("sessions")
+}
+
+// Mesajlaşma geçmişi
+model Message {
+  id          String    @id @default(uuid())
+  sessionId   String
+  session     Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  role        MessageRole
+  content     String
+  
+  // Moderator analysis metadata
+  analysis    Json?
+  
+  round       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  
+  @@map("messages")
+}
+
+// Saldırı stratejileri
+model Strategy {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  
+  // System prompt for attacker AI
+  attackerSystemPrompt String
+  
+  // Initial attack prompt template
+  initialPrompt String
+  
+  // Tags for categorization
+  tags        String[]
+  
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  
+  sessions    Session[]
+  
+  @@map("strategies")
+}
+
+enum SessionStatus {
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+enum SessionResult {
+  PENDING
+  SUCCESS      // Jailbreak başarılı
+  FAILED       // Jailbreak başarısız
+  DETECTED     // Hedef saldırıyı tespit etti
+}
+
+enum MessageRole {
+  ATTACKER     // Saldırgan AI'ın ürettiği prompt
+  TARGET       // Hedef sistemin cevabı
+  MODERATOR    // Denetleyici AI'ın analizi
+  SYSTEM       // Sistem mesajları
+}
+
+// Optimize edilmiş promptlar
+model OptimizedPrompt {
+  id          String    @id @default(uuid())
+  projectId   String
+  
+  // Orijinal prompt
+  originalPrompt    String
+  
+  // İyileştirilmiş prompt
+  optimizedPrompt   String
+  
+  // Optimizasyon detayları
+  optimizationType  OptimizationType
+  improvements      String[]    // Yapılan iyileştirmeler listesi
+  
+  // Başarı metrikleri
+  successRate       Float       @default(0)
+  usageCount        Int         @default(0)
+  
+  // Kaynak bilgisi
+  sourceSessionIds  String[]    // Hangi session'lardan öğrenildi
+  
+  // AI analizi
+  analysis          Json?       // Detaylı AI analizi
+  
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@map("optimized_prompts")
+}
+
+// Prompt şablonları kütüphanesi
+model PromptTemplate {
+  id          String    @id @default(uuid())
+  
+  name        String
+  description String?
+  category    String    // jailbreak, social_engineering, roleplay, etc.
+  
+  // Şablon içeriği
+  template    String    // {{target}}, {{goal}}, {{context}} gibi değişkenler içerebilir
+  
+  // Örnek kullanım
+  exampleUsage String?
+  
+  // Etkililik metrikleri
+  successRate Float     @default(0)
+  totalUses   Int       @default(0)
+  
+  // Etiketler
+  tags        String[]
+  
+  isBuiltIn   Boolean   @default(false)  // Sistem tarafından mı oluşturuldu
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  
+  @@map("prompt_templates")
+}
+
+// Başarılı saldırı örnekleri (öğrenme için)
+model SuccessfulAttack {
+  id          String    @id @default(uuid())
+  projectId   String
+  sessionId   String
+  
+  // Başarılı prompt
+  attackPrompt      String
+  
+  // Hedef sistemin kırılan yanıtı
+  targetResponse    String
+  
+  // Hangi teknik kullanıldı
+  technique         String?
+  
+  // Neden başarılı olduğunun analizi
+  successAnalysis   String?
+  
+  // Etiketler
+  tags              String[]
+  
+  createdAt         DateTime  @default(now())
+  
+  @@map("successful_attacks")
+}
+
+enum OptimizationType {
+  ENHANCE           // Mevcut promptu güçlendir
+  COMBINE           // Birden fazla başarılı promptu birleştir
+  ADAPT             // Farklı hedefe adapte et
+  SIMPLIFY          // Daha basit ve etkili hale getir
+  OBFUSCATE         // Tespit edilmesi zor hale getir
+}
+
+// Güvenlik raporları
+model Report {
+  id          String    @id @default(uuid())
+  projectId   String
+  
+  // Rapor içeriği
+  projectName       String
+  model             String
+  
+  // İstatistikler
+  totalSessions     Int
+  successfulAttacks Int
+  failedAttacks     Int
+  detectedAttacks   Int
+  successRate       Int
+  avgRounds         Int
+  
+  // Strateji istatistikleri
+  strategyStats     Json?
+  
+  // Rapor bölümleri
+  executiveSummary      String    @db.Text
+  vulnerabilityAnalysis String    @db.Text
+  attackPatterns        String    @db.Text
+  successfulTechniques  String    @db.Text
+  riskAssessment        String    @db.Text
+  recommendations       String    @db.Text
+  
+  createdAt   DateTime  @default(now())
+  
+  @@map("reports")
+}
